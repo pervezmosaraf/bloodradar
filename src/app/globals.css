@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 15, 23, 42;
+  --background-start-rgb: 249, 250, 251;
+  --background-end-rgb: 255, 255, 255;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background-color: #f9fafb;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Sequential radar wave animations */
+@keyframes ring-pulse-1 {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.02); }
+}
+
+@keyframes ring-pulse-2 {
+  0%, 100% { opacity: 0.2; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.015); }
+}
+
+@keyframes ring-pulse-3 {
+  0%, 100% { opacity: 0.15; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.01); }
+}
+
+@keyframes radar-sweep {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.radar-ring-1 {
+  animation: ring-pulse-1 3s ease-in-out infinite;
+}
+
+.radar-ring-2 {
+  animation: ring-pulse-2 3s ease-in-out infinite;
+  animation-delay: 0.6s;
+}
+
+.radar-ring-3 {
+  animation: ring-pulse-3 3s ease-in-out infinite;
+  animation-delay: 1.2s;
+}
+
+.radar-sweep-beam {
+  animation: radar-sweep 6s linear infinite;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .radar-ring-1,
+  .radar-ring-2,
+  .radar-ring-3,
+  .radar-sweep-beam,
+  .animate-pulse,
+  .animate-spin {
+    animation: none !important;
+  }
+}
