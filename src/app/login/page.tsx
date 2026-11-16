@@ -19,10 +19,16 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isMissingSupabase = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (isMissingSupabase) {
+      setError("Supabase Database is not connected! .env.local is missing with your Supabase credentials. Please add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local.");
+      return;
+    }
 
     if (!email.trim() || !password) {
       setError("Please provide both email address and password.");
@@ -47,6 +53,8 @@ export default function LoginPage() {
           setError(
             "Your email address has not been confirmed yet. Please check your inbox for the activation link."
           );
+        } else if (authError.message.toLowerCase().includes("fetch failed") || authError.message.toLowerCase().includes("failed to fetch")) {
+          setError("Connection Error: Cannot reach Supabase database. Please check your .env.local configuration.");
         } else {
           setError(authError.message || "Sign in failed. Please try again.");
         }

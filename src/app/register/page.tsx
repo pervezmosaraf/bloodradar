@@ -27,6 +27,7 @@ export default function RegisterPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isMissingSupabase = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder");
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -46,6 +47,11 @@ export default function RegisterPage() {
     setFormError(null);
     setSuccessMessage(null);
     setFieldErrors({});
+
+    if (isMissingSupabase) {
+      setFormError("Supabase Database is not connected! .env.local is missing with your Supabase credentials. Please add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local.");
+      return;
+    }
 
     // 1. Zod Validation
     const validation = registerSchema.safeParse({
@@ -92,6 +98,8 @@ export default function RegisterPage() {
           setFormError("This email is already registered. Please sign in instead.");
         } else if (error.message.toLowerCase().includes("weak password") || error.message.toLowerCase().includes("least 8 characters")) {
           setFormError("Password is too weak. Please use at least 8 characters with numbers and letters.");
+        } else if (error.message.toLowerCase().includes("fetch failed") || error.message.toLowerCase().includes("failed to fetch")) {
+          setFormError("Connection Error: Cannot reach Supabase database. Please verify your internet connection and .env.local configuration.");
         } else {
           setFormError(error.message || "Failed to create account. Please check your connection and try again.");
         }
@@ -163,6 +171,19 @@ export default function RegisterPage() {
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+                {/* Supabase Missing Configuration Notice */}
+                {isMissingSupabase && (
+                  <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-amber-900">Database Connection Required</p>
+                      <p className="text-amber-800 mt-0.5">
+                        Supabase credentials not detected in <code>.env.local</code>. Please configure your project URL and Anon Key to activate live registration.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Form-level Error Banner */}
                 {formError && (
                   <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 flex items-start gap-2.5 animate-shake">
