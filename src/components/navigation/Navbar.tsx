@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 import { Activity, Menu, X, ShieldAlert, Heart, User, LogOut } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 export interface NavbarProps {
   user?: {
@@ -16,9 +18,73 @@ export interface NavbarProps {
   onSignOut?: () => void;
 }
 
-export function Navbar({ user, onSignOut }: NavbarProps) {
+export function Navbar({ user: propUser, onSignOut: propSignOut }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const supabase = createClient();
+
+  const [activeUser, setActiveUser] = useState<NavbarProps["user"]>(propUser || null);
+
+  useEffect(() => {
+    if (propUser !== undefined) {
+      setActiveUser(propUser);
+      return;
+    }
+
+    // Auto-detect session from Supabase client
+    async function checkAuth() {
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData?.user) {
+          const userMeta = authData.user.user_metadata || {};
+
+          // Query profile for role confirmation
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("full_name, role")
+            .eq("id", authData.user.id)
+            .single();
+
+          setActiveUser({
+            email: authData.user.email || "",
+            role: (profile?.role || userMeta.role || "requester") as any,
+            fullName: profile?.full_name || userMeta.full_name || authData.user.email?.split("@")[0] || "User",
+          });
+        } else {
+          setActiveUser(null);
+        }
+      } catch {
+        setActiveUser(null);
+      }
+    }
+
+    checkAuth();
+
+    // Listen to auth state transitions
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        checkAuth();
+      } else {
+        setActiveUser(null);
+      }
+    });
+
+    return () => {
+      listener?.subscription.unsubscribe();
+    };
+  }, [propUser, supabase]);
+
+  const handleSignOut = async () => {
+    if (propSignOut) {
+      propSignOut();
+      return;
+    }
+    await supabase.auth.signOut();
+    setActiveUser(null);
+    router.push("/");
+    router.refresh();
+  };
 
   const navLinks = [
     { label: "Find Donors", href: "/find-donors" },
@@ -28,11 +94,10 @@ export function Navbar({ user, onSignOut }: NavbarProps) {
   ];
 
   const getDashboardHref = () => {
-    if (!user) return "/login";
-    if (user.role === "donor") return "/donor";
-    if (user.role === "requester") return "/requester";
-    if (user.role === "admin") return "/admin";
-    return "/";
+    if (!activeUser) return "/login";
+    if (activeUser.role === "donor") return "/dashboard/donor";
+    if (activeUser.role === "admin") return "/dashboard/admin";
+    return "/dashboard/requester";
   };
 
   return (
@@ -77,32 +142,33 @@ export function Navbar({ user, onSignOut }: NavbarProps) {
               <Button
                 variant="danger"
                 size="sm"
-                className="gap-1.5 font-bold animate-pulse hover:animate-none"
+                className="gap-1.5 font-bold animate-pulse hover:animate-none shadow-sm"
               >
                 <ShieldAlert className="w-4 h-4" />
                 Emergency SOS
               </Button>
             </Link>
 
-            {user ? (
+            {activeUser ? (
               <div className="flex items-center gap-2">
                 <Link href={getDashboardHref()}>
-                  <Button variant="secondary" size="sm" className="gap-1.5">
-                    <User className="w-4 h-4" />
-                    Dashboard
+                  <Button variant="secondary" size="sm" className="gap-1.5 text-xs font-semibold">
+                    <User className="w-4 h-4 text-brand-600" />
+                    <span>{activeUser.fullName}</span>
+                    <Badge variant="default" size="sm" className="ml-1 capitalize text-[10px]">
+                      {activeUser.role}
+                    </Badge>
                   </Button>
                 </Link>
-                {onSignOut && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={onSignOut}
-                    title="Sign Out"
-                    className="text-slate-500 hover:text-red-600"
-                  >
-                    <LogOut className="w-4 h-4" />
-                  </Button>
-                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSignOut}
+                  title="Sign Out"
+                  className="text-slate-500 hover:text-red-600"
+                >
+                  <LogOut className="w-4 h-4" />
+                </Button>
               </div>
             ) : (
               <div className="flex items-center gap-2">
@@ -111,8 +177,8 @@ export function Navbar({ user, onSignOut }: NavbarProps) {
                     Sign In
                   </Button>
                 </Link>
-                <Link href="/register-donor">
-                  <Button variant="outline" size="sm" className="gap-1.5 border-brand-200 text-brand-600 hover:bg-brand-50">
+                <Link href="/become-a-donor">
+                  <Button variant="outline" size="sm" className="gap-1.5 border-brand-200 text-brand-600 hover:bg-brand-50 font-semibold">
                     <Heart className="w-3.5 h-3.5 fill-brand-600 text-brand-600" />
                     Become a Donor
                   </Button>
@@ -141,7 +207,7 @@ export function Navbar({ user, onSignOut }: NavbarProps) {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-slate-200 bg-white px-4 pt-3 pb-6 space-y-4">
+        <div className="md:hidden border-b border-slate-200 bg-white px-4 pt-3 pb-6 space-y-4 shadow-lg">
           <nav className="flex flex-col space-y-2">
             {navLinks.map((link) => (
               <Link
@@ -159,27 +225,26 @@ export function Navbar({ user, onSignOut }: NavbarProps) {
           </nav>
 
           <div className="pt-3 border-t border-slate-100 flex flex-col gap-2.5">
-            {user ? (
+            {activeUser ? (
               <>
                 <Link href={getDashboardHref()} onClick={() => setMobileMenuOpen(false)}>
                   <Button variant="secondary" fullWidth className="gap-2">
-                    <User className="w-4 h-4" />
-                    My Dashboard ({user.role})
+                    <User className="w-4 h-4 text-brand-600" />
+                    Dashboard ({activeUser.fullName})
                   </Button>
                 </Link>
-                {onSignOut && (
-                  <Button
-                    variant="ghost"
-                    fullWidth
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      onSignOut();
-                    }}
-                    className="text-red-600 hover:bg-red-50"
-                  >
-                    Sign Out
-                  </Button>
-                )}
+                <Button
+                  variant="ghost"
+                  fullWidth
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleSignOut();
+                  }}
+                  className="text-red-600 hover:bg-red-50 gap-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </Button>
               </>
             ) : (
               <>
@@ -188,7 +253,7 @@ export function Navbar({ user, onSignOut }: NavbarProps) {
                     Sign In
                   </Button>
                 </Link>
-                <Link href="/register-donor" onClick={() => setMobileMenuOpen(false)}>
+                <Link href="/become-a-donor" onClick={() => setMobileMenuOpen(false)}>
                   <Button variant="primary" fullWidth className="gap-2">
                     <Heart className="w-4 h-4 fill-white" />
                     Register as Donor

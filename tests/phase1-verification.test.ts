@@ -99,10 +99,13 @@ describe("Phase 1 Verification Suite", () => {
         phone: "01711223344",
         password: "securepassword123",
         bloodGroup: "O+",
+        dateOfBirth: "1995-05-15",
+        weightConfirmed: true,
         latitude: 23.7465, // Dhanmondi
         longitude: 90.376,
         addressText: "Dhanmondi 27, Dhaka",
         isAvailable: true,
+        disclaimerAccepted: true,
       };
       const result = donorRegistrationSchema.safeParse(validDonor);
       assert.equal(result.success, true);
@@ -115,12 +118,32 @@ describe("Phase 1 Verification Suite", () => {
         phone: "01711223344",
         password: "securepassword123",
         bloodGroup: "O+",
+        dateOfBirth: "1995-05-15",
+        weightConfirmed: true,
         latitude: 40.7128, // New York latitude
         longitude: -74.006,
         addressText: "New York, USA",
         isAvailable: true,
+        disclaimerAccepted: true,
       };
       const result = donorRegistrationSchema.safeParse(invalidDonor);
+      assert.equal(result.success, false);
+    });
+
+    it("should reject donor registration if under 18 years old", () => {
+      const underageDonor = {
+        fullName: "Young Donor",
+        email: "young@example.com",
+        phone: "01711223344",
+        password: "securepassword123",
+        bloodGroup: "O+",
+        dateOfBirth: new Date(Date.now() - 15 * 365.25 * 86400 * 1000).toISOString().split("T")[0], // 15 years old
+        weightConfirmed: true,
+        latitude: 23.7465,
+        longitude: 90.376,
+        disclaimerAccepted: true,
+      };
+      const result = donorRegistrationSchema.safeParse(underageDonor);
       assert.equal(result.success, false);
     });
 
